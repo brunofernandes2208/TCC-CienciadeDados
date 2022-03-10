@@ -1,0 +1,264 @@
+import pandas_datareader as pdr
+import datetime as dt
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings
+#
+from datetime import date
+pd.set_option('display.max_columns',None)
+pd.set_option('display.max_rows', None)
+class NClass():pass
+param = NClass()
+
+from pandas_datareader import data
+param.gain = 0.05
+param.DaysAhead = 30
+stock = 0
+param.stock_list = ['BOVA11.SA']
+param.dt_begin = dt.datetime(2017, 1, 1)
+param.dt_end = dt.datetime(2021, 12, 31)
+param.dt_check = '2020-11-17'
+param.source = 'yahoo'
+df = data.DataReader(param.stock_list[stock], param.source, param.dt_begin, param.dt_end)
+df.head()
+
+df.index.duplicated().sum()
+(df==0).astype(int).sum()
+df[df.Volume==0].head()
+
+print("Porcentagem de dados nulos: %.2f%%" % (df.Volume[df.Volume==0].count()/df.Volume.count()*100))
+
+(df.dropna(axis=0)).head()
+(df==0).astype(int).sum()
+
+df_Dol=pd.read_csv('D:\BRUNO\Desktop\CSV\dolar.csv')
+df_Dol.head(5)
+
+df_Dol['Último'] = df_Dol['Último'].replace({',':'.'},regex=True)
+df_Dol['Abertura'] = df_Dol['Abertura'].replace({',':'.'},regex=True)
+df_Dol['Máxima'] = df_Dol['Máxima'].replace({',':'.'},regex=True)
+df_Dol['Mínima'] = df_Dol['Mínima'].replace({',':'.'},regex=True)
+df_Dol.head()
+
+df_Dol = df_Dol.drop('Var%', axis=1)
+df_Dol.head()
+
+df_Dol['Último'] = df_Dol['Último'].astype(float)
+df_Dol['Abertura'] = df_Dol['Abertura'].astype(float)
+df_Dol['Máxima'] = df_Dol['Máxima'].astype(float)
+df_Dol['Mínima'] = df_Dol['Mínima'].astype(float)
+df_Dol['Data'] = pd.to_datetime(df_Dol.Data, format='%d.%m.%Y')
+
+df_Dol = df_Dol.rename(columns={"Último": "dolar_close",
+                               "Abertura": "dolar_open",
+                                "Máxima":"dolar_max",
+                                "Mínima":"dolar_min"})
+df_Dol.head()
+
+df_Dol = df_Dol.set_index('Data')
+df_Dol.head()
+
+df_Dol[df_Dol==0].count()
+df.head()
+df_Dol.head()
+
+data=df.join(df_Dol)
+data.head()
+data.isnull().sum()
+
+import mplfinance as mpf
+mpf.plot(df, type='candle',mav=(9,21),volume=False,show_nontrading=True, figsize=(10,5))
+df_candle = df.iloc[1230:1238,:]
+mpf.plot(df_candle, type='candle',mav=(9,21),volume=False,show_nontrading=False, figsize=(8,4),style="charles")
+data.describe()
+
+data.boxplot(figsize=(10,4))
+data.drop('Volume',axis=1).boxplot(figsize=(10,4))
+
+data['seq']= range(0,len(data['Open']))
+data['varOpenClose'] = data.Close-data.Open
+data['varHighLow'] = data.High-data.Low
+data['mean9'] = data.Close.rolling(9).mean()
+data['mean21'] = data.Close.rolling(21).mean()
+data['closeGreaterM9'] = (data.Close>data.mean9)
+data['closeGreaterM21'] = (data.Close>data.mean21)
+data['varCloseM9'] = data.Close-data.mean9
+data['varCloseM21'] = data.Close-data.mean21
+data['varM9M21'] = data.mean9-data.mean21
+data['corr9'] = np.array(data.Close.rolling(9).corr(data.seq))
+data['corr21'] = np.array(data.Close.rolling(21).corr(data.seq))
+data['corr45'] = np.array(data.Close.rolling(45).corr(data.seq))
+data['corr60'] = np.array(data.Close.rolling(60).corr(data.seq))
+data['corr90'] = np.array(data.Close.rolling(90).corr(data.seq))
+data['corr180'] = np.array(data.Close.rolling(180).corr(data.seq))
+data['dolar_varOpenClose'] = data.dolar_close-data.dolar_open
+data['dolar_varMaxMin'] = data.dolar_max-data.dolar_min
+for i in range(1,90):
+    data['varHighDm'+str(i)] = data.Close-data.High.shift(periods=i)
+    data['varCloseDm'+str(i)] = data.Close-data.Close.shift(periods=i)
+    data['dolar_varHighDm'+str(i)] = data.dolar_close-data.dolar_max.shift(periods=i)
+    data['dolar_varCloseDm'+str(i)] = data.dolar_close-data.dolar_close.shift(periods=i)
+    
+fig, ax1 = plt.subplots(figsize=(15,5))
+
+ax2 = ax1.twinx()
+ax1.plot(data['High'],'b',linewidth=0.5)
+ax2.plot(data['corr90'],color='#500', ls='-', linewidth=0.5)
+
+ax1.set_xlabel('ano')
+ax1.set_ylabel('valor')
+ax2.set_ylabel('correlação', color='#500')
+
+plt.show()
+
+data.head()
+
+def mean_norm(data):
+    return data.apply(lambda x: (x-x.mean())/ x.std(), axis=0)
+
+dataN = mean_norm(data)
+dataN.head()
+
+targetH = np.array(range(0,len(dataN.index)))
+i=0
+for idataN in dataN.index:
+    targetH[i]=0
+    count=1
+    while count<=param.DaysAhead:
+        i2 = i + count
+        if i2>= len(dataN.index): break
+        if data.iloc[i2]['High']/data.iloc[i]['Close']>=1+param.gain: targetH[i]=1
+        count += 1
+    i+=1
+dataN['targetH'] = targetH 
+dataN.targetH[dataN.targetH==0].count()
+dataN.targetH[dataN.targetH==1].count()
+
+corrdataN = dataN.corr(method='pearson')[['targetH']]
+plt.figure(figsize=(15,10))
+sns.heatmap(corrdataN,annot=False)
+corrdataN.describe()
+dataN.isnull().sum()
+
+dataN = dataN.dropna()
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score, roc_curve, classification_report, accuracy_score
+from sklearn.metrics import recall_score, precision_score, f1_score, confusion_matrix, auc
+
+for col in dataN.columns: dataN[col] = dataN[col].astype(float)
+y=dataN.targetH
+x=dataN.drop(['targetH'], axis=1)
+x_train,x_test, y_train,y_test = train_test_split(x,y,test_size=0.3, random_state=42)
+    
+x_new = dataN.drop(['targetH'], axis=1).tail(1)
+for col in x_new.columns: x_new[col]=x_new[col].astype(float)   
+
+y_pred=pd.DataFrame(columns=('Stock','model','precTest','recallTest','precAll', 'recallAll','targetH'))
+y_pred['model']=['Regressão', 'Árvore', 'RNA','XGBoost']
+y_pred['Stock']=param.stock_list[stock][:5]
+
+modelo = LogisticRegression(penalty='none', solver='newton-cg')
+
+modelo.fit(x_train, y_train)
+LogisticRegression(C=1.0, class_weight=None, dual=False, fit_intercept=True,
+                  intercept_scaling=1, l1_ratio=None, max_iter=100,
+                  multi_class='warn', n_jobs=None, penalty='none',
+                  random_state=None, solver='newton-cg', tol=0.0001, verbose=0,
+                  warm_start=False)
+print(modelo.coef_)
+
+print('- Matriz de confusão')
+print(confusion_matrix(y_test, modelo.predict(x_test)))
+print('\n- Reporte Completo')
+print(classification_report(y, modelo.predict(x)))
+print('\n- Reporte Teste')
+print(classification_report(y_test, modelo.predict(x_test)))
+
+y_pred.targetH[y_pred.model=='Regressão'] = modelo.predict(x_new)
+y_pred.precAll[y_pred.model=='Regressão'] = precision_score(y, modelo.predict(x))
+y_pred.precTest[y_pred.model=='Regressão'] = precision_score(y_test, modelo.predict(x_test))
+y_pred.recallAll[y_pred.model=='Regressão'] = recall_score(y, modelo.predict(x))
+y_pred.recallTest[y_pred.model=='Regressão'] = recall_score(y_test, modelo.predict(x_test))
+
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.model_selection import train_test_split
+from sklearn import metrics, tree
+
+model = DecisionTreeClassifier(criterion="entropy", max_depth=5)
+model = model.fit(x_train,y_train)
+fig = plt.figure(figsize=(20,10))
+_=tree.plot_tree(model,
+                feature_names=x.columns,
+                class_names=['targetNo', 'targetYes'],
+                filled=True)
+                
+print('- Matriz de confusão')
+print(confusion_matrix(y_test, model.predict(x_test)))
+print('\n- Reporte Completo')
+print(classification_report(y, model.predict(x)))
+print('\n- Reporte Teste')
+print(classification_report(y_test, model.predict(x_test)))
+
+y_pred.targetH[y_pred.model=='Árvore'] = model.predict(x_new)
+y_pred.precAll[y_pred.model=='Árvore'] = precision_score(y, model.predict(x))
+y_pred.precTest[y_pred.model=='Árvore'] = precision_score(y_test, model.predict(x_test))
+y_pred.recallAll[y_pred.model=='Árvore'] = recall_score(y, model.predict(x))
+y_pred.recallTest[y_pred.model=='Árvore'] = recall_score(y_test, model.predict(x_test))
+
+import keras
+from keras import Sequential
+from keras.layers import Dense
+
+model = Sequential()
+model.add(Dense(15, activation='relu', kernel_initializer='random_normal', input_dim=len(x.columns)))
+model.add(Dense(7, activation='relu', kernel_initializer='random_normal', input_dim=len(x.columns)))
+model.add(Dense(3, activation='relu', kernel_initializer='random_normal', input_dim=len(x.columns)))
+model.add(Dense(3, activation='relu', kernel_initializer='random_normal', input_dim=len(x.columns)))
+model.add(Dense(1, activation='sigmoid', kernel_initializer='random_normal'))
+
+model.compile(optimizer = 'adam', loss = 'mean_squared_error', metrics = ['accuracy'])
+model.fit(x_train,y_train, batch_size=128, epochs=300, verbose=False)
+eval_model=model.evaluate(x_train,y_train)
+eval_model
+
+print('- Matriz de confusão')
+print(confusion_matrix(y_test, np.round(model.predict(x_test)).astype(int)))
+print('\n- Reporte Completo')
+print(classification_report(y, np.round(model.predict(x)).astype(int)))
+print('\n- Reporte Teste')
+print(classification_report(y_test, np.round(model.predict(x_test)).astype(int)))
+
+y_pred.targetH[y_pred.model=='RNA'] = np.round(model.predict(x_new)).astype(int)
+y_pred.precAll[y_pred.model=='RNA'] = precision_score(y, np.round(model.predict(x)).astype(int))
+y_pred.precTest[y_pred.model=='RNA'] = precision_score(y_test, np.round(model.predict(x_test)).astype(int))
+y_pred.recallAll[y_pred.model=='RNA'] = recall_score(y, np.round(model.predict(x)).astype(int))
+y_pred.recallTest[y_pred.model=='RNA'] = recall_score(y_test, np.round(model.predict(x_test)).astype(int))
+
+from xgboost import XGBClassifier
+
+model = XGBClassifier(max_depth=9, scale_pos_weight=0.2, objective='binary:logistic', eval_metric='error', 
+                      use_label_encoder=False)
+model.fit(x_train,y_train)
+y_pred_temp = model.predict(x_test)
+accuracy = accuracy_score(y_test, y_pred_temp)
+print ("Accuracy: %.2f%%" % (accuracy*100.0))
+
+print('- Matriz de confusão')
+print(confusion_matrix(y_test, model.predict(x_test)))
+print('\n- Reporte Completo')
+print(classification_report(y, model.predict(x)))
+print('\n- Reporte Teste')
+print(classification_report(y_test, model.predict(x_test)))
+
+y_pred.targetH[y_pred.model=='XGBoost'] = model.predict(x_new)
+y_pred.precAll[y_pred.model=='XGBoost'] = precision_score(y, model.predict(x))
+y_pred.precTest[y_pred.model=='XGBoost'] = precision_score(y_test, model.predict(x_test))
+y_pred.recallAll[y_pred.model=='XGBoost'] = recall_score(y, model.predict(x))
+y_pred.recallTest[y_pred.model=='XGBoost'] = recall_score(y_test, model.predict(x_test))
+
+
+
+
+
