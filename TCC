@@ -260,7 +260,7 @@ y_pred.precTest[y_pred.model=='XGBoost'] = precision_score(y_test, model.predict
 y_pred.recallAll[y_pred.model=='XGBoost'] = recall_score(y, model.predict(x))
 y_pred.recallTest[y_pred.model=='XGBoost'] = recall_score(y_test, model.predict(x_test))
 
-
+y_pred.head()
 
 
 
