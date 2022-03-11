@@ -157,7 +157,9 @@ for col in x_new.columns: x_new[col]=x_new[col].astype(float)
 
 y_pred=pd.DataFrame(columns=('Stock','model','precTest','recallTest','precAll', 'recallAll','targetH'))
 y_pred['model']=['Regressão', 'Árvore', 'RNA','XGBoost']
-y_pred['Stock']=param.stock_list[stock][:5]
+y_pred['Stock']=param.stock_list[stock][:6]
+
+from sklearn.linear_model import LogisticRegression
 
 modelo = LogisticRegression(penalty='none', solver='newton-cg')
 
